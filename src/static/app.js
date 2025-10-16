@@ -37,12 +37,18 @@ document.addEventListener("DOMContentLoaded", () => {
         // Build participants HTML
         let participantsHtml = "";
         if (details.participants && details.participants.length > 0) {
-          participantsHtml = `<ul class="participants-list">` +
-            details.participants.map(email => {
-              const display = friendlyNameFromEmail(email);
-              return `<li><span class="participant-avatar">${display.charAt(0)}</span><span class="participant-email">${display}</span><span class="participant-email-muted"> • ${email}</span></li>`;
-            }).join("") +
-            `</ul>`;
+            participantsHtml = `<ul class="participants-list">` +
+              details.participants.map(email => {
+                const display = friendlyNameFromEmail(email);
+                // include a delete button with data attributes for activity and email
+                return `<li>
+                  <span class="participant-avatar">${display.charAt(0)}</span>
+                  <span class="participant-email">${display}</span>
+                  <span class="participant-email-muted"> • ${email}</span>
+                  <button class="participant-delete" data-activity="${encodeURIComponent(name)}" data-email="${encodeURIComponent(email)}" title="Remove participant">\u2716;</button>
+                </li>`;
+              }).join("") +
+              `</ul>`;
         } else {
           participantsHtml = `<p class="no-participants">No participants yet</p>`;
         }
@@ -65,6 +71,35 @@ document.addEventListener("DOMContentLoaded", () => {
         option.value = name;
         option.textContent = name;
         activitySelect.appendChild(option);
+      });
+
+      // Attach delete handlers after rendering
+      document.querySelectorAll('.participant-delete').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const activityEncoded = btn.getAttribute('data-activity');
+          const emailEncoded = btn.getAttribute('data-email');
+          const activity = decodeURIComponent(activityEncoded);
+          const email = decodeURIComponent(emailEncoded);
+
+          if (!confirm(`Unregister ${email} from ${activity}?`)) return;
+
+          try {
+            const resp = await fetch(`/activities/${encodeURIComponent(activity)}/participants?email=${encodeURIComponent(email)}`, {
+              method: 'DELETE'
+            });
+
+            const result = await resp.json();
+            if (resp.ok) {
+              // refresh the list
+              fetchActivities();
+            } else {
+              alert(result.detail || 'Failed to remove participant');
+            }
+          } catch (err) {
+            console.error('Error removing participant', err);
+            alert('Failed to remove participant');
+          }
+        });
       });
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
